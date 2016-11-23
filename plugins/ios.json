@@ -7,6 +7,9 @@
         "files": {}
     },
     "installed_plugins": {
+        "cordova-plugin-inappbrowser": {
+            "PACKAGE_NAME": "com.ionicframework.canyourememberme322971"
+        },
         "cordova-plugin-device": {
             "PACKAGE_NAME": "com.ionicframework.canyourememberme322971"
         },
@@ -19,21 +22,26 @@
         "cordova-plugin-file-transfer": {
             "PACKAGE_NAME": "com.ionicframework.canyourememberme322971"
         },
-        "cordova-plugin-inappbrowser": {
+        "cordova-plugin-splashscreen": {
             "PACKAGE_NAME": "com.ionicframework.canyourememberme322971"
         },
         "cordova-plugin-network-information": {
-            "PACKAGE_NAME": "com.ionicframework.canyourememberme322971"
-        },
-        "cordova-plugin-splashscreen": {
             "PACKAGE_NAME": "com.ionicframework.canyourememberme322971"
         },
         "cordova-plugin-whitelist": {
             "PACKAGE_NAME": "com.ionicframework.canyourememberme322971"
         },
         "phonegap-plugin-push": {
+            "SENDER_ID": "478860020961",
+            "PACKAGE_NAME": "com.ionicframework.canyourememberme322971"
+        },
+        "ionic-plugin-deploy": {
             "PACKAGE_NAME": "com.ionicframework.canyourememberme322971"
         }
     },
-    "dependent_plugins": {}
+    "dependent_plugins": {
+        "cordova-plugin-compat": {
+            "PACKAGE_NAME": "com.ionicframework.canyourememberme322971"
+        }
+    }
 }

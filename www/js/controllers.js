@@ -1,5 +1,5 @@
 angular.module('starter.controllers', [])
-.controller('AppCtrl', function($scope, $ionicModal, $ionicPopup, $state, $filter, $ionicLoading, $cordovaFacebook, ngFB, $cordovaFile, $cordovaFileTransfer, $cordovaNetwork, $timeout, $ionicPush, $http, $cordovaDevice, $rootScope) {
+.controller('AppCtrl', function($scope, $ionicModal, $ionicPopup, $state, $filter, $ionicLoading, $cordovaFacebook, ngFB, $cordovaFile, $cordovaFileTransfer, $cordovaNetwork, $timeout, $ionicPush, $http, $cordovaDevice, $rootScope, ThumbnailService) {
 	
   // With the new view caching in Ionic, Controllers are only called
   // when they are recreated or on app start, instead of every page change.
@@ -746,43 +746,83 @@ angular.module('starter.controllers', [])
 				else
 				{
 					$scope.showFileMsg = false;
-					var name = "photo.png";
-					var parseFile = new Parse.File(name, file);
-					parseFile.save().then(function(parseFile) {
-					  
-						userRegister.set("photoFile", parseFile);
-						//////////////////////////////////////////////
-						userRegister.signUp(null, {
-						  success: function(userRegisterResponse) {
-						   //alert("userRegisterResponse=="+JSON.stringify(userRegisterResponse));
-						   $scope.hideLoading();
-						   //call function for update MentionTo field
-						   $scope.updateMentionTo(userRegisterResponse,false);
-					   
-							Parse.User.logOut();
-							$scope.beforeloginLinks	 = true;
-							$scope.afterloginLinks   = false;
+					
+					//Define function for convert image data into base64 string
+					var fileReader = new FileReader();
+					fileReader.onload = function(fileLoadedEvent) {
+						var fileBase64Data = fileLoadedEvent.target.result; // data: base64
+						
+						//call function for generate thumbnail and save in Parse server
+						var thumbSizeObj={ width:100, height:100};
+						$scope.generateThumbnailAndSaveUserPhotoParse(fileBase64Data,thumbSizeObj);
 							
-							$scope.registerThanks();
-							$scope.registerMsg = true;
-							$scope.registerMsgValue ="Please verifying your email address before Login.";
-							$scope.$apply();
-						  },
-						  error: function(userRegisterResponse, error) {
-							// Show the error message somewhere and let the user try again.
-							$scope.hideLoading();
-							$scope.registerMsg = true;
-							$scope.registerMsgValue = $scope.firstCharCapital(error.message);
+						//call function for user photo save in Parse server
+						$scope.saveUserPhotoFileParse(fileBase64Data);
+						$scope.$apply();
+					}
+					//call function for convert image data into base64 string
+					fileReader.readAsDataURL(file);
+					
+					//Define function for generate thumbnail and User Photo save in Parse server
+					$scope.generateThumbnailAndSaveUserPhotoParse = function(fileBase64Data,thumbSizeObjData) {
+					  ThumbnailService.generate(fileBase64Data,thumbSizeObjData).then(
+						function success(thumbFile) {
+						  var name = "photoThumb.png";
+						  var parseFileThumb = new Parse.File(name, { base64: thumbFile});
+						  parseFileThumb.save().then(function(parseFileThumb) {
+						  userRegister.set("photoFile", parseFileThumb);
+						}, 
+						  function(error) {
+							// The file either could not be read, or could not be saved to Parse.
+							// alert("Error: " + error.code + " " + error.message);
+						  });
+						},
+						function error(reason) {
+						 // alert('Error: ' + reason);
+						}
+					  );
+					}
+					
+					//Define function for file save in Parse server
+					$scope.saveUserPhotoFileParse = function(fileBase64Data) {
+						var name = "photo.png";
+						var parseFile = new Parse.File(name, { base64: fileBase64Data});
+						parseFile.save().then(function(parseFile) {
+						  
+							userRegister.set("orgPhotoFile", parseFile);
+							//////////////////////////////////////////////
+							userRegister.signUp(null, {
+							  success: function(userRegisterResponse) {
+							   //alert("userRegisterResponse=="+JSON.stringify(userRegisterResponse));
+							   $scope.hideLoading();
+							   //call function for update MentionTo field
+							   $scope.updateMentionTo(userRegisterResponse,false);
+						   
+								Parse.User.logOut();
+								$scope.beforeloginLinks	 = true;
+								$scope.afterloginLinks   = false;
+								
+								$scope.registerThanks();
+								$scope.registerMsg = true;
+								$scope.registerMsgValue ="Please verifying your email address before Login.";
+								$scope.$apply();
+							  },
+							  error: function(userRegisterResponse, error) {
+								// Show the error message somewhere and let the user try again.
+								$scope.hideLoading();
+								$scope.registerMsg = true;
+								$scope.registerMsgValue = $scope.firstCharCapital(error.message);
+								//console.log("Error: " + error.code + " " + error.message);
+								$scope.$apply();
+							  }
+							});
+							//////////////////////////////////////////////
+						}, 
+						  function(error) {
+							// The file either could not be read, or could not be saved to Parse.
 							//console.log("Error: " + error.code + " " + error.message);
-							$scope.$apply();
-						  }
-						});
-						//////////////////////////////////////////////
-					}, 
-					  function(error) {
-						// The file either could not be read, or could not be saved to Parse.
-						//console.log("Error: " + error.code + " " + error.message);
-					  });
+						  });
+					}//saveUserPhotoFileParse function end here
 				}
 			}
 			else
@@ -1151,7 +1191,7 @@ angular.module('starter.controllers', [])
 				//alert("data=="+JSON.stringify(data));
 				//store device detail for userin Installation class
 				
-				var platform = $cordovaDevice.getPlatform();
+			   var platform = $cordovaDevice.getPlatform();
 			   if(platform=="Android")
 			   {
 				   var pushType='gcm';
@@ -1168,16 +1208,16 @@ angular.module('starter.controllers', [])
 								  deviceType: platform,
 								  pushType: pushType,
 								  deviceToken: data.token
-								 };
-					// Run our Parse Cloud Code and pass our 'data' object to it
-					Parse.Cloud.run("registerForNotifications", pushdata, {
-					  success: function(object) {
-						//alert("result11=="+JSON.stringify(object));
-					  },
-					  error: function(error) {
-						//alert("error=="+JSON.stringify(error));
-					  }
-					});
+							  };
+				// Run our Parse Cloud Code and pass our 'data' object to it
+				Parse.Cloud.run("registerForNotifications", pushdata, {
+				  success: function(object) {
+					//alert("result11=="+JSON.stringify(object));
+				  },
+				  error: function(error) {
+					//alert("error=="+JSON.stringify(error));
+				  }
+				});
 			  }
 			});
 			$ionicPush.register();	
@@ -1308,72 +1348,116 @@ angular.module('starter.controllers', [])
 							else
 							{
 								$scope.showFileMsg = false;
-								var name = "photo.png";
-								var parseFile = new Parse.File(name, file);
-								parseFile.save().then(function(parseFile) {
-								  
-									editUser.set("photoFile", parseFile);
-									//////////////////////////////////////////////
-									editUser.save(null, {
-									  success: function(editUserResponse) {
-										// alert("editUserResponse=="+JSON.stringify(editUserResponse));
-										 
-										 //set current user is Loged In when exit app and re open it.
-										 var token = editUserResponse.get('token');
-										 Parse.User.become(token);
-										 
-										 $scope.firstName 		 = editUserResponse.get("firstName");
-										 $scope.middleName 		 = editUserResponse.get("middleName");
-										 $scope.surName 		 = editUserResponse.get("surName");
-										 $scope.dateOfBirth 	 = $filter('date')(editUserResponse.get("dateOfBirth"), "dd/MM/yyyy");
-										 
-										 window.localStorage.setItem("uFirstName", editUserResponse.get("firstName"));
-										 window.localStorage.setItem("uMiddleName", editUserResponse.get("middleName"));
-										 window.localStorage.setItem("uSurName", editUserResponse.get("surName"));
-										 window.localStorage.setItem("uDateOfBirth", $filter('date')(editUserResponse.get("dateOfBirth"), "dd/MM/yyyy"));
-										 //get user image
-										 var photoFileObj = editUserResponse.get("photoFile");
-										 if(photoFileObj!=undefined)
-										 {
-											var url 		  = photoFileObj.url();
-											$scope.photo 	  = url;
-											//call function for download ing
-											$scope.downloadFile(url);
-										 }
-										 else
-										 {
-											$scope.photo 	  = 'img/user.png';
-											window.localStorage.removeItem("uPhotolocalPath");
-										 }
-										 
-										 $scope.editUserModal.hide();
-										 $scope.hideLoading();
-										 $scope.$apply();
-									  },
-									  error: function(editUserResponse, error) {
-										// Show the error message somewhere and let the user try again.
-										$scope.hideLoading(); 
-										$scope.editUserMsg = true;
-										$scope.editUserMsgValue = $scope.firstCharCapital(error.message);
-										$timeout(function() {
-										 $scope.editUserMsg = false;
-										 $scope.editUserMsgValue = "";
-										}, 4000);
-										$scope.$apply();
-									  }
-									});
-									//////////////////////////////////////////////
-								}, 
-								  function(error) {
-									  $scope.hideLoading();
-									  $scope.editUserMsg = true;
-									  $scope.editUserMsgValue = $scope.firstCharCapital(error.message);
-									  $timeout(function() {
-										 $scope.editUserMsg = false;
-										 $scope.editUserMsgValue = "";
-									  }, 4000);
-									  $scope.$apply();
-								  });
+								
+								//Define function for convert image data into base64 string
+								var fileReader = new FileReader();
+								fileReader.onload = function(fileLoadedEvent) {
+									var fileBase64Data = fileLoadedEvent.target.result; // data: base64
+									
+									//call function for generate thumbnail and save in Parse server
+									var thumbSizeObj={ width:100, height:100};
+									$scope.generateThumbnailAndSaveUserPhotoParse(fileBase64Data,thumbSizeObj);
+									
+									//call function for update user photo in Parse server
+									$scope.updateUserPhotoFileParse(fileBase64Data);
+									$scope.$apply();
+								}
+								//call function for convert image data into base64 string
+								fileReader.readAsDataURL(file);
+								
+								//Define function for generate thumbnail and User Photo save in Parse server
+								$scope.generateThumbnailAndSaveUserPhotoParse = function(fileBase64Data,thumbSizeObjData) {
+								  ThumbnailService.generate(fileBase64Data,thumbSizeObjData).then(
+									function success(thumbFile) {
+									  $scope.UPhoto=thumbFile;
+									  var name = "photoThumb.png";
+									  var parseFileThumb = new Parse.File(name, { base64: thumbFile});
+									  parseFileThumb.save().then(function(parseFileThumb) {
+									  editUser.set("photoFile", parseFileThumb);
+									  //save CYRmeMemory object
+									  editUser.save();
+									  // alert('success: file upload');
+									}, 
+									  function(error) {
+										// The file either could not be read, or could not be saved to Parse.
+										// alert("Error: " + error.code + " " + error.message);
+									  });
+									},
+									function error(reason) {
+									 // alert('Error: ' + reason);
+									}
+								  );
+								}
+						
+								//Define function for file save in Parse server
+								$scope.updateUserPhotoFileParse = function(fileBase64Data) {
+									var name = "photo.png";
+									var parseFile = new Parse.File(name, { base64: fileBase64Data});
+									parseFile.save().then(function(parseFile) {
+									  
+										editUser.set("orgPhotoFile", parseFile);
+										//////////////////////////////////////////////
+										editUser.save(null, {
+										  success: function(editUserResponse) {
+											// alert("editUserResponse=="+JSON.stringify(editUserResponse));
+											 
+											 //set current user is Loged In when exit app and re open it.
+											 var token = editUserResponse.get('token');
+											 Parse.User.become(token);
+											 
+											 $scope.firstName 		 = editUserResponse.get("firstName");
+											 $scope.middleName 		 = editUserResponse.get("middleName");
+											 $scope.surName 		 = editUserResponse.get("surName");
+											 $scope.dateOfBirth 	 = $filter('date')(editUserResponse.get("dateOfBirth"), "dd/MM/yyyy");
+											 
+											 window.localStorage.setItem("uFirstName", editUserResponse.get("firstName"));
+											 window.localStorage.setItem("uMiddleName", editUserResponse.get("middleName"));
+											 window.localStorage.setItem("uSurName", editUserResponse.get("surName"));
+											 window.localStorage.setItem("uDateOfBirth", $filter('date')(editUserResponse.get("dateOfBirth"), "dd/MM/yyyy"));
+											 //get user image
+											 var photoFileObj = editUserResponse.get("photoFile");
+											 if(photoFileObj!=undefined)
+											 {
+												var url 		  = photoFileObj.url();
+												$scope.photo 	  = url;
+												//call function for download ing
+												$scope.downloadFile(url);
+											 }
+											 else
+											 {
+												$scope.photo 	  = 'img/user.png';
+												window.localStorage.removeItem("uPhotolocalPath");
+											 }
+											 
+											 $scope.editUserModal.hide();
+											 $scope.hideLoading();
+											 $scope.$apply();
+										  },
+										  error: function(editUserResponse, error) {
+											// Show the error message somewhere and let the user try again.
+											$scope.hideLoading(); 
+											$scope.editUserMsg = true;
+											$scope.editUserMsgValue = $scope.firstCharCapital(error.message);
+											$timeout(function() {
+											 $scope.editUserMsg = false;
+											 $scope.editUserMsgValue = "";
+											}, 4000);
+											$scope.$apply();
+										  }
+										});
+										//////////////////////////////////////////////
+									}, 
+									  function(error) {
+										  $scope.hideLoading();
+										  $scope.editUserMsg = true;
+										  $scope.editUserMsgValue = $scope.firstCharCapital(error.message);
+										  $timeout(function() {
+											 $scope.editUserMsg = false;
+											 $scope.editUserMsgValue = "";
+										  }, 4000);
+										  $scope.$apply();
+									 });
+								} //updateUserPhotoFileParse function End
 							}
 						}
 						else
@@ -1917,44 +2001,37 @@ angular.module('starter.controllers', [])
 	   //Define Send Notification function
 		$scope.sendNotification=function(deviceToken,deviceType,pushType,fromUserName)
 		{	
+			// Define relevant info
+			var jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1OTNmMThkYi1jNjRhLTQ1ZDctYmE2ZS0xMTUxN2YxZmY1ZjkifQ.qzgmZxvZuOc6ho_3Kt07L0UY-__RwyYwBAfDILcFlk8';
 			var tokens = [deviceToken];
-			//Ionic CYRme App ID
-			var appId 		= 'c89f83f4';
-			//Ionic CYRme App Key
-			var privateKey  = '86463055733ab9c6afa85c593bf782c748d3e9ba2a1ea7be';
-			
-			// Encode your key
-			var auth = btoa(privateKey + ':');
+			var profile = 'cyrme';
 			
 			// Build the request object
 			var req = {
 			  method: 'POST',
-			  url: 'https://push.ionic.io/api/v1/push',
+			  url: 'https://api.ionic.io/push/notifications',
 			  headers: {
 				'Content-Type': 'application/json',
-				'X-Ionic-Application-Id': appId,
-				'Authorization': 'basic ' + auth
+				'Authorization': 'Bearer ' + jwt
 			  },
 			  data: {
 				"tokens": tokens,
-				"production": false,
+				"profile": profile,
 				"notification": {
-				  "alert":fromUserName+" shared a memory with you!",
+				  "title": "Memory",
+				  "message": fromUserName+" shared a memory with you!",
+				  "image": "www/img/logo.png"
 				}
 			  }
 			};
-	
-			//alert("req"+JSON.stringify(req));
+			
 			// Make the API call
 			$http(req).success(function(resp){
 			  // Handle success
-			  //console.log("Ionic Push: Push success!");
-			 // $scope.sendMail("anil@bunkerbound.net",'Ionic Push success',JSON.stringify(resp),'anil@bunkerbound.net','anil');
-			 // alert("Ionic Push: Push success!=="+JSON.stringify(resp));
+			  //alert("Ionic Push: Push success=="+JSON.stringify(resp));
 			}).error(function(error){
 			  // Handle error 
-			 // console.log("Ionic Push: Push error...");
-			 // alert("error=="+JSON.stringify(error));
+			  //alert("Ionic Push: Push error=="+JSON.stringify(error));
 			});
 		}
 		//////////////////////////////////////////////////////////////////////////
@@ -2145,7 +2222,7 @@ angular.module('starter.controllers', [])
 					 if(otherUserEmailList.length>0)
 					 {
 						var  to			= otherUserEmailList;
-						var  subject	= currentUserName+' have been Invited to CYRMe APP';
+						var  subject	= currentUserName+' have been Invited to Remember APP';
 						var  message	= '.';
 						var  from		= currentUserEmail;
 						var  fromName	= currentUserName;
@@ -2253,55 +2330,74 @@ angular.module('starter.controllers', [])
 					else
 					{
 						$scope.showFileMsg = false;
-					}
+						
+						//Define function for convert image data into base64 string
+						var fileReader = new FileReader();
+						fileReader.onload = function(fileLoadedEvent) {
+							var fileBase64Data = fileLoadedEvent.target.result; // data: base64
+							//alert("fileBase64Data=="+JSON.stringify(fileBase64Data));
+							//call function for Memory file save in Parse server
+							$scope.saveMemoryFileParse(fileBase64Data);
+							//call function for generate Memory thumbnail and save in Parse server
+							var thumbSizeObj={ width:100, height:100};
+							$scope.generateThumbnailAndSaveParse(fileBase64Data,thumbSizeObj);
+							$scope.$apply();
+						}
+						//call function for convert image data into base64 string
+						fileReader.readAsDataURL(file);
+						
 						//upload file to parse server
-						var name = "photo.png";
-						var parseFile = new Parse.File(name, file);
-						parseFile.save().then(function(parseFile) {
-							CYRmeMemory.set("image", parseFile);
-						   //save CYRmeMemory object
-						   CYRmeMemory.save(null, {
-							  success: function(memoryRes) {
-								//get activity image
-								var memoryImgObj = memoryRes.get("image");
-								if(memoryImgObj!=undefined)
-								{
-									var memoryImg   = '<img src="'+memoryImgObj.url()+'" >';
-								}
-								else
-								{
-									var memoryImg   = '';
-								}
-								//get memory content
-								 var memoryContent 	 	=memoryRes.get('content');
-								 if(memoryContent!="undefined")
-								 {
-									memoryContent 	 =memoryContent;
-								 }
-								 else
-								 { 
-									 memoryContent 	 ="";
-								 }
-								//call invite users function
-								$scope.inviteUsers(mentionToArray,memoryImg,memoryContent);
-								$scope.$apply();
-							  },
-							  error: function(error) {
-								//alert("Error: " + error.code + " " + error.message);
-								$scope.$apply();
-							  }
-							});
-						}, 
-						  function(error) {
-							// The file either could not be read, or could not be saved to Parse.
-							// alert("Error: " + error.code + " " + error.message);
-						  });
+						////////////////////////////////Memory file upload Start////////////////////////////////////////////////
+						//Define function for Memory file save in Parse server
+						$scope.saveMemoryFileParse = function(fileBase64Data) {
+							var name = "photo.png";
+							var parseFile = new Parse.File(name, { base64: fileBase64Data});
+							parseFile.save().then(function(parseFile) {
+								CYRmeMemory.set("image", parseFile);
+							   //save CYRmeMemory object
+							   CYRmeMemory.save(null, {
+								  success: function(memoryRes) {
+									//get activity image
+									var memoryImgObj = memoryRes.get("image");
+									if(memoryImgObj!=undefined)
+									{
+										var memoryImg   = '<img src="'+memoryImgObj.url()+'" >';
+									}
+									else
+									{
+										var memoryImg   = '';
+									}
+									//get memory content
+									 var memoryContent 	 	=memoryRes.get('content');
+									 if(memoryContent!="undefined")
+									 {
+										memoryContent 	 =memoryContent;
+									 }
+									 else
+									 { 
+										 memoryContent 	 ="";
+									 }
+									//call invite users function
+									$scope.inviteUsers(mentionToArray,memoryImg,memoryContent);
+									$scope.$apply();
+								  },
+								  error: function(error) {
+									//alert("Error: " + error.code + " " + error.message);
+									$scope.$apply();
+								  }
+								});
+							}, 
+							  function(error) {
+								// The file either could not be read, or could not be saved to Parse.
+								// alert("Error: " + error.code + " " + error.message);
+							  });
+						}
+						////////////////////////////////Memory file upload End////////////////////////////////////////////////
 						
-						
-						////////////////////////////////Thumb nill upload start////////////////////////////////////////////////
+						////////////////////////////////Memory Thumb nill upload start////////////////////////////////////////////////
 						//Define function for generate thumbnail and save in Parse server
-						$scope.generateThumbnailAndSaveParse = function(fileData,thumbSizeObjData) {
-						  ThumbnailService.generate(fileData,thumbSizeObjData).then(
+						$scope.generateThumbnailAndSaveParse = function(fileBase64Data,thumbSizeObjData) {
+						  ThumbnailService.generate(fileBase64Data,thumbSizeObjData).then(
 							function success(thumbFile) {
 							  $scope.MPhoto=thumbFile;
 							  var name = "photoThumb.png";
@@ -2311,7 +2407,6 @@ angular.module('starter.controllers', [])
 							  //save CYRmeMemory object
 							  CYRmeMemory.save();
 							  // alert('success: file upload');
-							   
 							}, 
 							  function(error) {
 								// The file either could not be read, or could not be saved to Parse.
@@ -2323,25 +2418,8 @@ angular.module('starter.controllers', [])
 							}
 						  );
 						};
-						
-						
-						//Define function for convert image data into base64 string
-						var fileReader = new FileReader();
-						fileReader.onload = function(fileLoadedEvent) {
-							var thumbnillBase64Data = fileLoadedEvent.target.result; // <--- data: base64
-							//alert("thumbnillBase64Data=="+JSON.stringify(thumbnillBase64Data));
-							//call function for generate thumbnail and save in Parse server
-							var fileDataUrl = thumbnillBase64Data;
-							var thumbSizeObj={ width:100, height:100};
-							$scope.generateThumbnailAndSaveParse(fileDataUrl,thumbSizeObj);
-							$scope.$apply();
-							 //return srcData;
-						}
-						//call function for convert image data into base64 string
-						fileReader.readAsDataURL(file);
-						///////////////////////Thumb nill upload End////////////////////////////////
-						////////////////////////////////////////////////////////////////////////////////
-					
+						///////////////////////Memory Thumb nill upload End////////////////////////////////
+					}
 				}
 				else
 				{
@@ -3200,44 +3278,37 @@ angular.module('starter.controllers', [])
 	   //Define Send Notification function
 		$scope.sendNotificationActivity=function(deviceToken,deviceType,pushType,fromUserName)
 		{	
+			// Define relevant info
+			var jwt = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI1OTNmMThkYi1jNjRhLTQ1ZDctYmE2ZS0xMTUxN2YxZmY1ZjkifQ.qzgmZxvZuOc6ho_3Kt07L0UY-__RwyYwBAfDILcFlk8';
 			var tokens = [deviceToken];
-			//Ionic CYRme App ID
-			var appId 		= 'c89f83f4';
-			//Ionic CYRme App Key
-			var privateKey  = '86463055733ab9c6afa85c593bf782c748d3e9ba2a1ea7be';
-			
-			// Encode your key
-			var auth = btoa(privateKey + ':');
+			var profile = 'cyrme';
 			
 			// Build the request object
 			var req = {
 			  method: 'POST',
-			  url: 'https://push.ionic.io/api/v1/push',
+			  url: 'https://api.ionic.io/push/notifications',
 			  headers: {
 				'Content-Type': 'application/json',
-				'X-Ionic-Application-Id': appId,
-				'Authorization': 'basic ' + auth
+				'Authorization': 'Bearer ' + jwt
 			  },
 			  data: {
 				"tokens": tokens,
-				"production": false,
+				"profile": profile,
 				"notification": {
-				  "alert":fromUserName+" did some activity on memory!",
+				  "title": "Activity",
+				  "message": fromUserName+" did some activity on memory!",
+				   "image": "www/img/logo.png"
 				}
 			  }
 			};
-	
-			//alert("req"+JSON.stringify(req));
+			
 			// Make the API call
 			$http(req).success(function(resp){
 			  // Handle success
-			  //console.log("Ionic Push: Push success!");
-			 // $scope.sendMail("anil@bunkerbound.net",'Ionic Push success',JSON.stringify(resp),'anil@bunkerbound.net','anil');
-			 // alert("Ionic Push: Push success!=="+JSON.stringify(resp));
+			  //alert("Ionic Push: Push success=="+JSON.stringify(resp));
 			}).error(function(error){
 			  // Handle error 
-			 // console.log("Ionic Push: Push error...");
-			 // alert("error=="+JSON.stringify(error));
+			  //alert("Ionic Push: Push error=="+JSON.stringify(error));
 			});
 		}
 		//////////////////////////////////////////////////////////////////////////
@@ -3308,7 +3379,7 @@ angular.module('starter.controllers', [])
 			
 			if(Array.isArray(inviteUserListArray))
 			{	
-				//var inviteUser = inviteUserListArray[i];
+				var inviteUser = inviteUserListArray[i];
 				
 				//username field query var
 				var usernameQuery = new Parse.Query("_User");
@@ -3351,7 +3422,6 @@ angular.module('starter.controllers', [])
 								//Email id add in otherUserEmailList array 
 								otherUserEmailList.push(inviteUser);
 							 }
-							 // alert("otherUserEmailList=="+JSON.stringify(otherUserEmailList));
 						}
 						else
 						{
@@ -3404,7 +3474,7 @@ angular.module('starter.controllers', [])
 					 if(otherUserEmailList.length>0)
 					 {
 						var  to			= otherUserEmailList;
-						var  subject	= currentUserName+' have been Invited to CYRMe APP';
+						var  subject	= currentUserName+' have been Invited to Remember APP';
 						var  message	= '.';
 						var  from		= currentUserEmail;
 						var  fromName	= currentUserName;
@@ -3423,6 +3493,7 @@ angular.module('starter.controllers', [])
 						// Run sendEmail Parse Cloud function and pass 'data' object to it
 						Parse.Cloud.run("sendEmail", data, {
 						  success: function(object) {
+							//alert("Success! Email sent!");
 							//alert("result=="+JSON.stringify(object));
 						  },
 						  error: function(error) {
@@ -3515,54 +3586,76 @@ angular.module('starter.controllers', [])
 					{
 						$scope.showFileMsg = false;
 						//upload file to parse server
-						var name = "photo.png";
-						var parseFile = new Parse.File(name, file);
-						parseFile.save().then(function(parseFile) {
-							Activity.set("image", parseFile);
-						   //save Activity object
-						   Activity.save(null, {
-							  success: function(activityRes) {
-								 //alert("activityRes=="+JSON.stringify(activityRes));
-								//get activity image
-								var activityImgObj = activityRes.get("image");
-								if(activityImgObj!=undefined)
-								{
-									var activityImg   = '<img src="'+activityImgObj.url()+'" >';
-								}
-								else
-								{
-									var activityImg   = '';
-								}
-								//get activity content
-								 var activityContent 	 	=activityRes.get('content');
-								 if(activityContent!="undefined")
-								 {
-									activityContent 	 =activityContent;
-								 }
-								 else
-								 { 
-									 activityContent 	 ="";
-								 }
-								//call invite users function
-								$scope.inviteUsersActivity(mentionToArray,activityImg,activityContent);
-								$scope.$apply();
-							  },
-							  error: function(error) {
-								//alert("Error: " + error.code + " " + error.message);
-								$scope.$apply();
-							  }
-							});
-						}, 
-						  function(error) {
-							// The file either could not be read, or could not be saved to Parse.
-							// alert("Error: " + error.code + " " + error.message);
-						  });
 						
+						//Define function for convert image data into base64 string
+						var fileReader = new FileReader();
+						fileReader.onload = function(fileLoadedEvent) {
+							var fileBase64Data = fileLoadedEvent.target.result; // data: base64
+							//alert("fileBase64Data=="+JSON.stringify(fileBase64Data));
+							//call function for image save in Parse server
+							$scope.saveParseActivity(fileBase64Data);
+							//call function for generate thumbnail and save in Parse server
+							var thumbSizeObj={ width:100, height:100};
+							$scope.generateThumbnailAndSaveParseActivity(fileBase64Data,thumbSizeObj);
+							$scope.$apply();
+						}
+						//call function for convert image data into base64 string
+						fileReader.readAsDataURL(file);
+						
+						////////////////////////////////file upload start////////////////////////////////////////////////
+						//Define function for file save in Parse server
+						$scope.saveParseActivity = function(fileBase64Data) {
+							var name = "photo.png";
+							var parseFile = new Parse.File(name, { base64: fileBase64Data});
+							parseFile.save().then(function(parseFile) {
+								//alert("parseFile=="+JSON.stringify(parseFile));
+								Activity.set("image", parseFile);
+							   //save Activity object
+							   Activity.save(null, {
+								  success: function(activityRes) {
+									// alert("activityRes=="+JSON.stringify(activityRes));
+									//get activity image
+									var activityImgObj = activityRes.get("image");
+									if(activityImgObj!=undefined)
+									{
+										var activityImg   = '<img src="'+activityImgObj.url()+'" >';
+									}
+									else
+									{
+										var activityImg   = '';
+									}
+									//get activity content
+									 var activityContent 	 	=activityRes.get('content');
+									 if(activityContent!="undefined")
+									 {
+										activityContent 	 =activityContent;
+									 }
+									 else
+									 { 
+										 activityContent 	 ="";
+									 }
+									//call invite users function
+									$scope.inviteUsersActivity(mentionToArray,activityImg,activityContent);
+									$scope.$apply();
+								  },
+								  error: function(error) {
+									//alert("Error: " + error.code + " " + error.message);
+									$scope.$apply();
+								  }
+								});
+							}, 
+							  function(error) {
+								// The file either could not be read, or could not be saved to Parse.
+								// alert("Error: " + error.code + " " + error.message);
+							  });
+						};
+						///////////////////////file upload End////////////////////////////////
 						
 						////////////////////////////////Thumb nill upload start////////////////////////////////////////////////
 						//Define function for generate thumbnail and save in Parse server
-						$scope.generateThumbnailAndSaveParseActivity = function(fileData,thumbSizeObjData) {
-						  ThumbnailService.generate(fileData,thumbSizeObjData).then(
+						$scope.generateThumbnailAndSaveParseActivity = function(fileBase64Data,thumbSizeObjData) {
+						  //alert('fileBase64Data 2=='+JSON.stringify(fileBase64Data));
+						  ThumbnailService.generate(fileBase64Data,thumbSizeObjData).then(
 							function success(thumbFile) {
 							  $scope.APhoto=thumbFile;
 							  var name = "photoThumb.png";
@@ -3572,36 +3665,18 @@ angular.module('starter.controllers', [])
 							  //save Activity object
 							  Activity.save();
 							  // alert('success: file upload');
-							   
 							}, 
 							  function(error) {
 								// The file either could not be read, or could not be saved to Parse.
-								// alert("Error: " + error.code + " " + error.message);
+								//alert("Error: " + error.code + " " + error.message);
 							  });
 							},
 							function error(reason) {
-							 // alert('Error: ' + reason);
+							  //alert('Error: ' + reason);
 							}
 						  );
 						};
-						
-						
-						//Define function for convert image data into base64 string
-						var fileReader = new FileReader();
-						fileReader.onload = function(fileLoadedEvent) {
-							var thumbnillBase64Data = fileLoadedEvent.target.result; // <--- data: base64
-							//alert("thumbnillBase64Data=="+JSON.stringify(thumbnillBase64Data));
-							//call function for generate thumbnail and save in Parse server
-							var fileDataUrl = thumbnillBase64Data;
-							var thumbSizeObj={ width:100, height:100};
-							$scope.generateThumbnailAndSaveParseActivity(fileDataUrl,thumbSizeObj);
-							$scope.$apply();
-							 //return srcData;
-						}
-						//call function for convert image data into base64 string
-						fileReader.readAsDataURL(file);
 						///////////////////////Thumb nill upload End////////////////////////////////
-						////////////////////////////////////////////////////////////////////////////////
 					}
 				}
 				else

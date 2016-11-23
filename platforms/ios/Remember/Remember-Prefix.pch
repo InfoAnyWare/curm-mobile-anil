@@ -17,7 +17,7 @@
  under the License.
  */
 //
-// Prefix header for all source files of the 'canYouRememberMe' target in the 'canYouRememberMe' project
+// Prefix header for all source files of the 'Remember' target in the 'Remember' project
 //
 
 #ifdef __OBJC__

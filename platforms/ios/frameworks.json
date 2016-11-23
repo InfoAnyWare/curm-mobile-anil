@@ -1,4 +1,8 @@
 {
-    "AudioToolbox.framework": 1,
-    "SystemConfiguration.framework": 1
+    "AudioToolbox.framework": 2,
+    "SystemConfiguration.framework": 2,
+    "AddressBook.framework": 2,
+    "libsqlite3.tbd": 2,
+    "libz.tbd": 2,
+    "CoreTelephony.framework": 2
 }
